@@ -224,7 +224,15 @@ export async function signUp(displayName: string, email: string, password: strin
     password,
     options: { data: { display_name: name } },
   });
-  if (error) sbError(error, "Registrierung fehlgeschlagen.");
+  if (error) {
+    const message = error.message || "Registrierung fehlgeschlagen.";
+    if (/invalid path/i.test(message)) {
+      throw new Error(
+        "Ungültige Supabase-URL. In Vercel/`.env.local` muss NEXT_PUBLIC_SUPABASE_URL nur die Project URL sein, z. B. https://xxxx.supabase.co — ohne /rest/v1/.",
+      );
+    }
+    throw new Error(message);
+  }
   if (!data.user) throw new Error("Registrierung fehlgeschlagen.");
   if (!data.session) {
     throw new Error(
