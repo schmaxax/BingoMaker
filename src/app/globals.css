@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #efe3cb;
+  --paper-deep: #e4d3b0;
+  --ink: #1c1410;
+  --ink-soft: #5e4f43;
+  --stamp: #c44536;
+  --stamp-dark: #922f24;
+  --moss: #2f5d46;
+  --moss-soft: #dce8df;
+  --card: #fffaf1;
+  --line: #d7c7ab;
+  --gold: #c9a227;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-stamp: var(--stamp);
+  --color-stamp-dark: var(--stamp-dark);
+  --color-moss: var(--moss);
+  --color-moss-soft: var(--moss-soft);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-gold: var(--gold);
+  --font-sans: var(--font-nunito);
+  --font-serif: var(--font-fraunces);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100%;
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(196, 69, 54, 0.08), transparent 28%),
+    radial-gradient(circle at 88% 0%, rgba(47, 93, 70, 0.08), transparent 24%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.stamp-mark {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), transparent 40%),
+    repeating-linear-gradient(
+      -18deg,
+      rgba(196, 69, 54, 0.16) 0 2px,
+      transparent 2px 6px
+    );
+}
