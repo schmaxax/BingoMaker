@@ -4,10 +4,11 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppHeader, Field, PrimaryButton, Screen, inputClass } from "@/components/ui";
 import { PixelAvatar } from "@/components/pixel-avatar";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { useBingoStore } from "@/lib/store/use-bingo-store";
 
 export default function LoginForm() {
-  const { user, accounts, actions } = useBingoStore();
+  const { user, accounts, actions, backend, ready } = useBingoStore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
@@ -19,13 +20,14 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [magicLink, setMagicLink] = useState("");
+  const [magicSent, setMagicSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const consumed = useRef(false);
 
   useEffect(() => {
-    if (user && !magic) router.replace(next);
-  }, [user, magic, next, router]);
+    if (ready && user && !magic) router.replace(next);
+  }, [ready, user, magic, next, router]);
 
   useEffect(() => {
     if (!magic || consumed.current) return;
@@ -41,13 +43,15 @@ export default function LoginForm() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setMagicSent(false);
     setBusy(true);
     try {
       if (mode === "register") await actions.signUp(displayName, email, password);
       else if (mode === "login") await actions.signIn(email, password);
       else {
         const link = await actions.requestMagicLink(email);
-        setMagicLink(link);
+        if (link) setMagicLink(link);
+        else setMagicSent(true);
         return;
       }
       router.replace(next);
@@ -68,6 +72,14 @@ export default function LoginForm() {
             <p className="mt-2 text-ink-soft">
               Gemeinsame Felder, privater Fortschritt — und erst nach dem Reveal sieht die Gruppe alles.
             </p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+              Backend: {backend === "supabase" ? "Supabase" : "Lokal (Demo)"}
+            </p>
+            {!isSupabaseConfigured() ? (
+              <p className="mt-2 text-sm text-stamp">
+                Keine Supabase-Keys gesetzt. Daten bleiben nur in diesem Browser.
+              </p>
+            ) : null}
           </section>
 
           <div className="grid grid-cols-3 gap-2 rounded-2xl bg-paper-deep p-1 text-sm font-semibold">
@@ -85,6 +97,7 @@ export default function LoginForm() {
                   setMode(key);
                   setError("");
                   setMagicLink("");
+                  setMagicSent(false);
                 }}
                 className={`rounded-xl px-2 py-2 ${mode === key ? "bg-card shadow-sm" : "text-ink-soft"}`}
               >
@@ -93,10 +106,15 @@ export default function LoginForm() {
             ))}
           </div>
 
-          <form className="space-y-4" onSubmit={onSubmit}>
+          <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
             {mode === "register" ? (
               <Field label="Anzeigename">
-                <input className={inputClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+                <input
+                  className={inputClass}
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                />
               </Field>
             ) : null}
             <Field label="E-Mail">
@@ -123,10 +141,17 @@ export default function LoginForm() {
               </Field>
             ) : (
               <p className="text-sm text-ink-soft">
-                Im Demo-Modus wird der Link hier angezeigt, statt per E-Mail versendet zu werden.
+                {backend === "supabase"
+                  ? "Wir senden dir einen Login-Link per E-Mail."
+                  : "Im Demo-Modus wird der Link hier angezeigt."}
               </p>
             )}
             {error ? <p className="text-sm font-semibold text-stamp">{error}</p> : null}
+            {magicSent ? (
+              <p className="rounded-2xl bg-moss-soft p-3 text-sm text-moss">
+                Magic-Link wurde gesendet. Bitte E-Mail prüfen und den Link öffnen.
+              </p>
+            ) : null}
             {magicLink ? (
               <a href={magicLink} className="block break-all rounded-2xl bg-moss-soft p-3 text-sm text-moss underline">
                 {magicLink}
@@ -137,7 +162,7 @@ export default function LoginForm() {
             </PrimaryButton>
           </form>
 
-          {accounts.length > 0 ? (
+          {backend === "local" && accounts.length > 0 ? (
             <section className="space-y-2">
               <p className="text-sm font-semibold text-ink-soft">Accounts auf diesem Gerät</p>
               <div className="space-y-2">
@@ -147,8 +172,7 @@ export default function LoginForm() {
                     type="button"
                     className="flex w-full items-center gap-3 rounded-2xl border border-line bg-card px-4 py-3 text-left"
                     onClick={() => {
-                      actions.switchAccount(account.id);
-                      router.replace(next);
+                      void actions.switchAccount(account.id).then(() => router.replace(next));
                     }}
                   >
                     <PixelAvatar pixels={account.avatarPixels} name={account.displayName} size={40} />

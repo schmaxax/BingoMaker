@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { ProgressPhoto } from "@/components/progress-photo";
 import { AppHeader, Field, Screen, SecondaryButton, inputClass } from "@/components/ui";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { compressImage } from "@/lib/image";
-import { getBoard, upsertProgress } from "@/lib/store/actions";
-import { useBingoStore } from "@/lib/store/use-bingo-store";
+import { useBingoStore, useBoardDetail } from "@/lib/store/use-bingo-store";
 
 export default function CellPage() {
   const params = useParams<{ boardId: string; cellId: string }>();
   const { user } = useBingoStore();
   const { boardId, cellId } = params;
+  const { detail, error, loading, actions } = useBoardDetail(boardId);
 
   if (!user) {
     return (
@@ -23,27 +23,30 @@ export default function CellPage() {
     );
   }
 
-  let missingCell = false;
-  let loadError = "";
-  try {
-    const detail = getBoard(boardId);
-    missingCell = !detail.cells.some((item) => item.id === cellId);
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Nicht gefunden.";
-  }
-
-  if (loadError) {
+  if (loading) {
     return (
       <AuthGate>
-        <AppHeader title="Feld" backHref="/" />
+        <AppHeader title="Feld" backHref={`/boards/${boardId}`} />
         <Screen>
-          <p className="text-stamp">{loadError}</p>
+          <p className="text-ink-soft">Feld wird geladen …</p>
         </Screen>
       </AuthGate>
     );
   }
 
-  if (missingCell) {
+  if (error || !detail) {
+    return (
+      <AuthGate>
+        <AppHeader title="Feld" backHref="/" />
+        <Screen>
+          <p className="text-stamp">{error || "Nicht gefunden."}</p>
+        </Screen>
+      </AuthGate>
+    );
+  }
+
+  const cell = detail.cells.find((item) => item.id === cellId);
+  if (!cell) {
     return (
       <AuthGate>
         <AppHeader title="Feld" backHref={`/boards/${boardId}`} />
@@ -54,24 +57,25 @@ export default function CellPage() {
     );
   }
 
-  return <CellEditor boardId={boardId} cellId={cellId} userId={user.id} />;
-}
-
-function CellEditor({ boardId, cellId, userId }: { boardId: string; cellId: string; userId: string }) {
-  useBingoStore();
-  return <CellDraft boardId={boardId} cellId={cellId} userId={userId} />;
+  return <CellDraft boardId={boardId} cellId={cellId} userId={user.id} />;
 }
 
 function CellDraft({ boardId, cellId, userId }: { boardId: string; cellId: string; userId: string }) {
-  const detail = getBoard(boardId);
-  const cell = detail.cells.find((item) => item.id === cellId)!;
-  const mine = detail.progress.find((item) => item.cellId === cellId && item.userId === userId);
-  const others = detail.progress.filter((item) => item.cellId === cellId && item.userId !== userId);
-  const revealedOrOpen = !detail.board.revealEnabled || detail.board.status === "revealed";
-  const locked = detail.board.status === "archived" || detail.board.status === "revealed";
+  const { detail, actions } = useBoardDetail(boardId);
+  const cell = detail?.cells.find((item) => item.id === cellId);
+  const mine = detail?.progress.find((item) => item.cellId === cellId && item.userId === userId);
+  const others = detail?.progress.filter((item) => item.cellId === cellId && item.userId !== userId) ?? [];
+  const revealedOrOpen = !detail?.board.revealEnabled || detail?.board.status === "revealed";
+  const locked = detail?.board.status === "archived" || detail?.board.status === "revealed";
 
   const [note, setNote] = useState(mine?.note ?? "");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setNote(mine?.note ?? "");
+  }, [mine?.note, cellId]);
+
+  if (!detail || !cell) return null;
 
   return (
     <AuthGate>
@@ -81,8 +85,10 @@ function CellDraft({ boardId, cellId, userId }: { boardId: string; cellId: strin
           <div className="space-y-6">
             <section className="space-y-3 rounded-3xl border border-line bg-card p-4">
               <p className="font-serif text-2xl">{cell.title || `Feld ${cell.row + 1}/${cell.col + 1}`}</p>
-              {cell.description ? <p className="text-sm text-ink-soft whitespace-pre-wrap">{cell.description}</p> : null}
-              <p className="text-sm text-ink-soft">Titel und Beschreibung bearbeitest du in der Feldinhalte-Tabelle. Abhaken geht über das Bingo-Raster.</p>
+              {cell.description ? <p className="whitespace-pre-wrap text-sm text-ink-soft">{cell.description}</p> : null}
+              <p className="text-sm text-ink-soft">
+                Titel und Beschreibung bearbeitest du in der Feldinhalte-Tabelle. Abhaken geht über das Bingo-Raster.
+              </p>
             </section>
 
             <section className="space-y-3 rounded-3xl border border-line bg-card p-4">
@@ -100,7 +106,7 @@ function CellDraft({ boardId, cellId, userId }: { boardId: string; cellId: strin
                   onChange={(e) => setNote(e.target.value)}
                   onBlur={() => {
                     if (locked) return;
-                    upsertProgress(boardId, cellId, { note });
+                    void actions.upsertProgress(boardId, cellId, { note });
                   }}
                   placeholder="Beleg, Erinnerung, Insider …"
                 />
@@ -118,7 +124,7 @@ function CellDraft({ boardId, cellId, userId }: { boardId: string; cellId: strin
                     if (!file) return;
                     try {
                       const photoDataUrl = await compressImage(file);
-                      upsertProgress(boardId, cellId, { photoDataUrl });
+                      await actions.upsertProgress(boardId, cellId, { photoDataUrl });
                     } catch (err: unknown) {
                       setError(err instanceof Error ? err.message : "Foto fehlgeschlagen.");
                     }
@@ -131,7 +137,7 @@ function CellDraft({ boardId, cellId, userId }: { boardId: string; cellId: strin
                   {!locked ? (
                     <SecondaryButton
                       type="button"
-                      onClick={() => upsertProgress(boardId, cellId, { photoDataUrl: null })}
+                      onClick={() => void actions.upsertProgress(boardId, cellId, { photoDataUrl: null })}
                     >
                       Foto entfernen
                     </SecondaryButton>

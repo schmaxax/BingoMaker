@@ -1,23 +1,18 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { AppHeader, Field, PrimaryButton, Screen, SecondaryButton, inputClass } from "@/components/ui";
-import {
-  archiveBoard,
-  deleteBoard,
-  getBoard,
-  rotateInviteCode,
-  updateBoard,
-} from "@/lib/store/actions";
-import { useBingoStore } from "@/lib/store/use-bingo-store";
+import { useBingoStore, useBoardDetail } from "@/lib/store/use-bingo-store";
 
 export default function SettingsPage() {
   const params = useParams<{ boardId: string }>();
   const { user } = useBingoStore();
   const boardId = params.boardId;
+  const { detail, error, loading, actions } = useBoardDetail(boardId);
+  const router = useRouter();
 
   if (!user) {
     return (
@@ -27,14 +22,23 @@ export default function SettingsPage() {
     );
   }
 
-  try {
-    getBoard(boardId);
-  } catch (error) {
+  if (loading) {
+    return (
+      <AuthGate>
+        <AppHeader title="Einstellungen" backHref={`/boards/${boardId}`} />
+        <Screen>
+          <p className="text-ink-soft">Einstellungen werden geladen …</p>
+        </Screen>
+      </AuthGate>
+    );
+  }
+
+  if (error || !detail) {
     return (
       <AuthGate>
         <AppHeader title="Einstellungen" backHref="/" />
         <Screen>
-          <p className="text-stamp">{error instanceof Error ? error.message : "Kein Zugriff."}</p>
+          <p className="text-stamp">{error || "Kein Zugriff."}</p>
         </Screen>
       </AuthGate>
     );
@@ -44,48 +48,72 @@ export default function SettingsPage() {
 }
 
 function SettingsForm({ boardId }: { boardId: string }) {
-  const { version } = useBingoStore();
+  const { detail, actions } = useBoardDetail(boardId);
   const router = useRouter();
-  const detail = getBoard(boardId);
-  void version;
-  const { board } = detail;
+  const board = detail!.board;
   const [name, setName] = useState(board.name);
   const [ownerMode, setOwnerMode] = useState(board.ownerMode);
   const [revealEnabled, setRevealEnabled] = useState(board.revealEnabled);
   const [winLogicEnabled, setWinLogicEnabled] = useState(board.winLogicEnabled);
-  const [deadline, setDeadline] = useState(
-    board.revealDeadline ? board.revealDeadline.slice(0, 16) : "",
-  );
+  const [deadline, setDeadline] = useState(board.revealDeadline ? board.revealDeadline.slice(0, 16) : "");
   const [error, setError] = useState("");
   const [code, setCode] = useState(board.inviteCode);
 
-  function save(event: FormEvent) {
+  useEffect(() => {
+    if (!detail) return;
+    setName(detail.board.name);
+    setOwnerMode(detail.board.ownerMode);
+    setRevealEnabled(detail.board.revealEnabled);
+    setWinLogicEnabled(detail.board.winLogicEnabled);
+    setDeadline(detail.board.revealDeadline ? detail.board.revealDeadline.slice(0, 16) : "");
+    setCode(detail.board.inviteCode);
+  }, [detail]);
+
+  async function save(event: FormEvent) {
     event.preventDefault();
     try {
-      updateBoard(boardId, {
+      await actions.updateBoard(boardId, {
         name,
         ownerMode,
         revealEnabled,
         winLogicEnabled,
         revealDeadline: deadline ? new Date(deadline).toISOString() : null,
       });
+      setError("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
     }
   }
+
+  if (!detail) return null;
 
   return (
     <AuthGate>
       <div className="flex min-h-full flex-col">
         <AppHeader title="Einstellungen" backHref={`/boards/${boardId}`} />
         <Screen>
-          <form className="space-y-5" onSubmit={save}>
+          <form className="space-y-5" onSubmit={(event) => void save(event)}>
             <Field label="Name">
-              <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} disabled={!detail.canManage} />
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={!detail.canManage}
+              />
             </Field>
             <Toggle title="Owner/Admin-Modus" checked={ownerMode} onChange={setOwnerMode} disabled={!detail.canManage} />
-            <Toggle title="Reveal-Funktion" checked={revealEnabled} onChange={setRevealEnabled} disabled={!detail.canManage} />
-            <Toggle title="Gewinnlogik" checked={winLogicEnabled} onChange={setWinLogicEnabled} disabled={!detail.canManage} />
+            <Toggle
+              title="Reveal-Funktion"
+              checked={revealEnabled}
+              onChange={setRevealEnabled}
+              disabled={!detail.canManage}
+            />
+            <Toggle
+              title="Gewinnlogik"
+              checked={winLogicEnabled}
+              onChange={setWinLogicEnabled}
+              disabled={!detail.canManage}
+            />
             {revealEnabled ? (
               <Field label="Enddatum">
                 <input
@@ -119,7 +147,10 @@ function SettingsForm({ boardId }: { boardId: string }) {
                 <p className="font-mono text-xl tracking-[0.25em]">{code}</p>
                 <SecondaryButton
                   type="button"
-                  onClick={() => setCode(rotateInviteCode(boardId))}
+                  onClick={async () => {
+                    const next = await actions.rotateInviteCode(boardId);
+                    setCode(next);
+                  }}
                 >
                   Neuen Code erzeugen
                 </SecondaryButton>
@@ -131,8 +162,8 @@ function SettingsForm({ boardId }: { boardId: string }) {
             {detail.canManage ? (
               <SecondaryButton
                 type="button"
-                onClick={() => {
-                  archiveBoard(boardId);
+                onClick={async () => {
+                  await actions.archiveBoard(boardId);
                   router.push("/");
                 }}
               >
@@ -143,9 +174,9 @@ function SettingsForm({ boardId }: { boardId: string }) {
               <button
                 type="button"
                 className="w-full rounded-2xl bg-stamp-dark px-4 py-3.5 font-semibold text-white"
-                onClick={() => {
+                onClick={async () => {
                   if (confirm("Board unwiderruflich löschen?")) {
-                    deleteBoard(boardId);
+                    await actions.deleteBoard(boardId);
                     router.push("/");
                   }
                 }}

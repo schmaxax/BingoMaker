@@ -5,7 +5,6 @@ import { AuthGate } from "@/components/auth-gate";
 import { PixelPainter } from "@/components/pixel-painter";
 import { AppHeader, Field, PrimaryButton, Screen, inputClass } from "@/components/ui";
 import { emptyAvatar, normalizeAvatar } from "@/lib/avatar";
-import { updateProfile } from "@/lib/store/actions";
 import { useBingoStore } from "@/lib/store/use-bingo-store";
 
 export default function ProfilePage() {
@@ -29,10 +28,10 @@ function ProfileForm() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  function save(event?: FormEvent) {
+  async function save(event?: FormEvent) {
     event?.preventDefault();
     try {
-      actions.updateProfile(name, pixels);
+      await actions.updateProfile(name, pixels);
       setError("");
       setSaved(true);
     } catch (err: unknown) {
@@ -46,7 +45,7 @@ function ProfileForm() {
       <div className="flex min-h-full flex-col">
         <AppHeader title="Profil" backHref="/" />
         <Screen>
-          <form className="space-y-6" onSubmit={save}>
+          <form className="space-y-6" onSubmit={(event) => void save(event)}>
             <Field label="Anzeigename">
               <input
                 className={inputClass}

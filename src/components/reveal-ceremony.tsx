@@ -11,10 +11,11 @@ import {
   revealScoreForUser,
   reviewedCellCount,
 } from "@/lib/reveal";
-import { restartReveal, stepReveal, toggleRevealDownvote } from "@/lib/store/actions";
+import { useBingoStore } from "@/lib/store/use-bingo-store";
 import type { BoardDetail } from "@/lib/types";
 
 export function RevealCeremony({ detail, userId }: { detail: BoardDetail; userId: string }) {
+  const { actions } = useBingoStore();
   const { board, members, cells, progress, revealDownvotes } = detail;
   const session = detail.revealSession;
   const finished = Boolean(session?.finishedAt) || (session?.currentIndex ?? 0) >= cells.length;
@@ -53,8 +54,8 @@ export function RevealCeremony({ detail, userId }: { detail: BoardDetail; userId
           boardName={board.name}
           winners={ranked.filter((member) => winners.has(member.userId))}
           topScore={topScore}
-          onBack={() => stepReveal(board.id, -1)}
-          onRestart={() => restartReveal(board.id)}
+          onBack={() => void actions.stepReveal(board.id, -1)}
+          onRestart={() => void actions.restartReveal(board.id)}
         />
       ) : currentCell ? (
         <>
@@ -119,7 +120,7 @@ export function RevealCeremony({ detail, userId }: { detail: BoardDetail; userId
                     {completed && !mine ? (
                       <button
                         type="button"
-                        onClick={() => toggleRevealDownvote(board.id, currentCell.id, member.userId)}
+                        onClick={() => void actions.toggleRevealDownvote(board.id, currentCell.id, member.userId)}
                         className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
                           voted ? "bg-stamp text-white" : "border border-line bg-paper"
                         }`}
@@ -150,10 +151,10 @@ export function RevealCeremony({ detail, userId }: { detail: BoardDetail; userId
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <SecondaryButton type="button" disabled={currentIndex === 0} onClick={() => stepReveal(board.id, -1)}>
+            <SecondaryButton type="button" disabled={currentIndex === 0} onClick={() => void actions.stepReveal(board.id, -1)}>
               Zurück
             </SecondaryButton>
-            <PrimaryButton type="button" onClick={() => stepReveal(board.id, 1)}>
+            <PrimaryButton type="button" onClick={() => void actions.stepReveal(board.id, 1)}>
               {currentIndex + 1 >= cells.length ? "Ergebnis" : "Nächstes Feld"}
             </PrimaryButton>
           </div>

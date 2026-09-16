@@ -20,12 +20,12 @@ export default function NewBoardPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function onSubmit(event: FormEvent) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const board = actions.createBoard({
+      const board = await actions.createBoard({
         name,
         size,
         ownerMode,

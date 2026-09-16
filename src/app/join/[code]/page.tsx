@@ -4,27 +4,29 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { AppHeader, Screen } from "@/components/ui";
-import { joinBoard } from "@/lib/store/actions";
 import { useBingoStore } from "@/lib/store/use-bingo-store";
 
 export default function JoinPage() {
   const params = useParams<{ code: string }>();
-  const { user } = useBingoStore();
+  const { user, actions } = useBingoStore();
   const router = useRouter();
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    void (async () => {
       try {
-        const board = joinBoard(params.code);
-        router.replace(`/boards/${board.id}`);
+        const board = await actions.joinBoard(params.code);
+        if (!cancelled) router.replace(`/boards/${board.id}`);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Beitritt fehlgeschlagen.");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Beitritt fehlgeschlagen.");
       }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [user, params.code, router]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, params.code, router, actions]);
 
   return (
     <AuthGate>

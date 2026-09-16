@@ -9,7 +9,20 @@ npm install
 npm run dev
 ```
 
-Danach [http://localhost:3000](http://localhost:3000) öffnen. Ohne Supabase-Keys läuft die App im **Demo-Modus** (Daten im Browser, Realtime zwischen Tabs).
+Danach [http://localhost:3000](http://localhost:3000) öffnen.
+
+- **Ohne** `NEXT_PUBLIC_SUPABASE_*`: Demo-Modus (Daten nur im Browser/`localStorage`).
+- **Mit** Supabase-Keys: Auth, Boards und Fortschritt landen in der Supabase-DB.
+
+## Supabase + Vercel
+
+1. In Supabase den Inhalt von `supabase/schema.sql` im **SQL Editor** ausführen.
+2. Auth → Providers: E-Mail an. Für Tests optional **Confirm email** aus.
+3. Authentication → URL Configuration: Site URL = deine Vercel-URL, Redirect URLs = `https://deine-app.vercel.app/**` und `http://localhost:3000/**`.
+4. In Vercel → Project Settings → Environment Variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Neu deployen. Danach Registrierung/Login erscheint unter **Authentication → Users** und **Table Editor → profiles**.
 
 ## Getroffene Defaults zu den offenen Fragen
 
@@ -25,5 +38,5 @@ Danach [http://localhost:3000](http://localhost:3000) öffnen. Ohne Supabase-Key
 2. Logout, Account B anlegen, per Code beitreten.
 3. B hakt Felder ab — A sieht das erst nach Reveal (wenn Reveal an ist).
 
-Für echte Nutzung über mehrere Handys: Supabase-Projekt anlegen, `supabase/schema.sql` ausführen, `.env.local` aus `.env.example` füllen. Der aktuelle Client nutzt den lokalen Store; der SQL-Stand ist die Ziel-Datenbank mit RLS.
+Für echte Nutzung über mehrere Handys brauchst du die Supabase-Keys in Vercel (siehe oben).
 # BingoMaker

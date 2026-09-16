@@ -6,13 +6,13 @@ import { AuthGate } from "@/components/auth-gate";
 import { BingoGrid } from "@/components/bingo-grid";
 import { AppHeader, PrimaryButton, Screen, SecondaryButton } from "@/components/ui";
 import { statusLabel } from "@/lib/bingo";
-import { getBoard, ownerReveal, voteReveal } from "@/lib/store/actions";
-import { useBingoStore } from "@/lib/store/use-bingo-store";
+import { useBingoStore, useBoardDetail } from "@/lib/store/use-bingo-store";
 
 export default function BoardPage() {
   const params = useParams<{ boardId: string }>();
   const { user } = useBingoStore();
   const boardId = params.boardId;
+  const { detail, error, loading, actions } = useBoardDetail(boardId);
 
   if (!user) {
     return (
@@ -22,24 +22,31 @@ export default function BoardPage() {
     );
   }
 
-  let detail;
-  try {
-    detail = getBoard(boardId);
-  } catch (error) {
+  if (loading) {
     return (
       <AuthGate>
         <AppHeader title="Board" backHref="/" />
         <Screen>
-          <p className="rounded-3xl bg-card p-5 text-stamp">
-            {error instanceof Error ? error.message : "Board nicht gefunden."}
-          </p>
+          <p className="text-ink-soft">Board wird geladen …</p>
+        </Screen>
+      </AuthGate>
+    );
+  }
+
+  if (error || !detail) {
+    return (
+      <AuthGate>
+        <AppHeader title="Board" backHref="/" />
+        <Screen>
+          <p className="rounded-3xl bg-card p-5 text-stamp">{error || "Board nicht gefunden."}</p>
         </Screen>
       </AuthGate>
     );
   }
 
   const { board } = detail;
-  const inviteUrl = typeof window !== "undefined" ? `${window.location.origin}/join/${board.inviteCode}` : `/join/${board.inviteCode}`;
+  const inviteUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/join/${board.inviteCode}` : `/join/${board.inviteCode}`;
   const voted = detail.revealVotes.some((vote) => vote.userId === user.id);
   const latestBingo = detail.notices.find((notice) => notice.type === "bingo");
 
@@ -58,7 +65,9 @@ export default function BoardPage() {
 
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="rounded-full bg-card px-3 py-1 font-semibold">{statusLabel(board.status)}</span>
-              <span className="rounded-full bg-card px-3 py-1">{board.size}×{board.size}</span>
+              <span className="rounded-full bg-card px-3 py-1">
+                {board.size}×{board.size}
+              </span>
               <span className="rounded-full bg-card px-3 py-1">{detail.members.length} Leute</span>
               {board.winLogicEnabled ? <span className="rounded-full bg-card px-3 py-1">Gewinnlogik an</span> : null}
             </div>
@@ -82,7 +91,7 @@ export default function BoardPage() {
                 </p>
                 {board.ownerMode && detail.canRevealNow ? (
                   <div className="mt-3">
-                    <PrimaryButton type="button" onClick={() => ownerReveal(board.id)}>
+                    <PrimaryButton type="button" onClick={() => void actions.ownerReveal(board.id)}>
                       Board beenden & Reveal
                     </PrimaryButton>
                   </div>
@@ -92,7 +101,7 @@ export default function BoardPage() {
                     <p className="text-sm">
                       Stimmen: {detail.revealVotes.length}/{detail.votesNeeded} (Mehrheit)
                     </p>
-                    <SecondaryButton type="button" onClick={() => voteReveal(board.id)}>
+                    <SecondaryButton type="button" onClick={() => void actions.voteReveal(board.id)}>
                       {voted ? "Stimme zurückziehen" : "Für Auflösung stimmen"}
                     </SecondaryButton>
                   </div>

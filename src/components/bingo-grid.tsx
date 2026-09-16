@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { CellProgressSheet } from "@/components/cell-progress-sheet";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { findBingoLines } from "@/lib/bingo";
-import { upsertProgress } from "@/lib/store/actions";
+import { useBingoStore } from "@/lib/store/use-bingo-store";
 import type { BoardDetail } from "@/lib/types";
 
 export function BingoGrid({ detail, userId }: { detail: BoardDetail; userId: string }) {
   const { board, cells, progress } = detail;
   const locked = board.status === "archived" || board.status === "revealed";
+  const { actions } = useBingoStore();
   const [openCellId, setOpenCellId] = useState<string | null>(null);
   const openCell = cells.find((cell) => cell.id === openCellId) ?? null;
   const ownCompleted = useMemo(() => {
@@ -61,11 +62,7 @@ export function BingoGrid({ detail, userId }: { detail: BoardDetail; userId: str
                 aria-pressed={done}
                 aria-label={`${cell.title || `Feld ${cell.row + 1}/${cell.col + 1}`} ${done ? "abhaken rückgängig" : "abhaken"}`}
                 onClick={() => {
-                  try {
-                    upsertProgress(board.id, cell.id, { completed: !done });
-                  } catch {
-                    // archived boards reject writes
-                  }
+                  void actions.upsertProgress(board.id, cell.id, { completed: !done }).catch(() => undefined);
                 }}
                 className="absolute inset-0 p-1.5 text-left disabled:opacity-60 sm:p-2"
               >

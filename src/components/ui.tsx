@@ -44,8 +44,7 @@ export function AppHeader({ title, backHref }: { title?: string; backHref?: stri
               type="button"
               className="rounded-full border border-line bg-card px-3 py-1.5 text-sm"
               onClick={() => {
-                actions.signOut();
-                router.push("/login");
+                void actions.signOut().then(() => router.push("/login"));
               }}
             >
               Logout

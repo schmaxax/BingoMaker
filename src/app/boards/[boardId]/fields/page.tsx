@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { AppHeader, Screen, inputClass } from "@/components/ui";
-import { getBoard, updateCell } from "@/lib/store/actions";
-import { useBingoStore } from "@/lib/store/use-bingo-store";
+import { useBingoStore, useBoardDetail } from "@/lib/store/use-bingo-store";
 import type { Cell } from "@/lib/types";
 
 export default function FieldsPage() {
   const params = useParams<{ boardId: string }>();
   const { user } = useBingoStore();
   const boardId = params.boardId;
+  const { detail, error, loading, actions } = useBoardDetail(boardId);
 
   if (!user) {
     return (
@@ -21,31 +21,28 @@ export default function FieldsPage() {
     );
   }
 
-  let loadError = "";
-  try {
-    getBoard(boardId);
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Kein Zugriff.";
-  }
-
-  if (loadError) {
+  if (loading) {
     return (
       <AuthGate>
-        <AppHeader title="Feldinhalte" backHref="/" />
+        <AppHeader title="Feldinhalte" backHref={`/boards/${boardId}`} />
         <Screen>
-          <p className="text-stamp">{loadError}</p>
+          <p className="text-ink-soft">Felder werden geladen …</p>
         </Screen>
       </AuthGate>
     );
   }
 
-  return <FieldsTable boardId={boardId} />;
-}
+  if (error || !detail) {
+    return (
+      <AuthGate>
+        <AppHeader title="Feldinhalte" backHref="/" />
+        <Screen>
+          <p className="text-stamp">{error || "Kein Zugriff."}</p>
+        </Screen>
+      </AuthGate>
+    );
+  }
 
-function FieldsTable({ boardId }: { boardId: string }) {
-  const { version } = useBingoStore();
-  const detail = getBoard(boardId);
-  void version;
   const locked = detail.board.status === "archived";
 
   return (
@@ -54,7 +51,8 @@ function FieldsTable({ boardId }: { boardId: string }) {
         <AppHeader title="Feldinhalte" backHref={`/boards/${boardId}`} />
         <Screen>
           <p className="mb-4 text-sm text-ink-soft">
-            Titel und Beschreibung gelten für die ganze Gruppe. Private Notizen und Fotos hängst du direkt an die Bingo-Karte.
+            Titel und Beschreibung gelten für die ganze Gruppe. Private Notizen und Fotos hängst du direkt an die
+            Bingo-Karte.
           </p>
           <div className="-mx-4 overflow-x-auto px-4">
             <table className="w-full min-w-[32rem] border-separate border-spacing-0 overflow-hidden rounded-3xl border border-line bg-card text-left">
@@ -67,7 +65,13 @@ function FieldsTable({ boardId }: { boardId: string }) {
               </thead>
               <tbody>
                 {detail.cells.map((cell) => (
-                  <FieldRow key={cell.id} boardId={boardId} cell={cell} locked={locked} />
+                  <FieldRow
+                    key={cell.id}
+                    boardId={boardId}
+                    cell={cell}
+                    locked={locked}
+                    onSave={(title, description) => actions.updateCell(boardId, cell.id, title, description)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -78,16 +82,27 @@ function FieldsTable({ boardId }: { boardId: string }) {
   );
 }
 
-function FieldRow({ boardId, cell, locked }: { boardId: string; cell: Cell; locked: boolean }) {
+function FieldRow({
+  boardId,
+  cell,
+  locked,
+  onSave,
+}: {
+  boardId: string;
+  cell: Cell;
+  locked: boolean;
+  onSave: (title: string, description: string) => Promise<void>;
+}) {
+  void boardId;
   const [title, setTitle] = useState(cell.title);
   const [description, setDescription] = useState(cell.description);
   const [error, setError] = useState("");
 
-  function save() {
+  async function save() {
     if (locked) return;
     if (title === cell.title && description === cell.description) return;
     try {
-      updateCell(boardId, cell.id, title, description);
+      await onSave(title, description);
       setError("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
@@ -105,7 +120,7 @@ function FieldRow({ boardId, cell, locked }: { boardId: string; cell: Cell; lock
           value={title}
           disabled={locked}
           onChange={(event) => setTitle(event.target.value)}
-          onBlur={save}
+          onBlur={() => void save()}
           placeholder="Titel"
           aria-label={`Titel Feld ${cell.row + 1}/${cell.col + 1}`}
         />
@@ -117,7 +132,7 @@ function FieldRow({ boardId, cell, locked }: { boardId: string; cell: Cell; lock
           value={description}
           disabled={locked}
           onChange={(event) => setDescription(event.target.value)}
-          onBlur={save}
+          onBlur={() => void save()}
           placeholder="Beschreibung"
           aria-label={`Beschreibung Feld ${cell.row + 1}/${cell.col + 1}`}
         />

@@ -5,7 +5,7 @@ import { ProgressPhoto } from "@/components/progress-photo";
 import { Field, SecondaryButton, inputClass } from "@/components/ui";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { compressImage } from "@/lib/image";
-import { upsertProgress } from "@/lib/store/actions";
+import { useBingoStore } from "@/lib/store/use-bingo-store";
 import type { BoardDetail, Cell } from "@/lib/types";
 
 export function CellProgressSheet({
@@ -19,6 +19,7 @@ export function CellProgressSheet({
   userId: string;
   onClose: () => void;
 }) {
+  const { actions } = useBingoStore();
   const mine = detail.progress.find((item) => item.cellId === cell.id && item.userId === userId);
   const others = detail.progress.filter((item) => item.cellId === cell.id && item.userId !== userId);
   const revealedOrOpen = !detail.board.revealEnabled || detail.board.status === "revealed";
@@ -58,7 +59,7 @@ export function CellProgressSheet({
               onChange={(event) => setNote(event.target.value)}
               onBlur={() => {
                 if (locked || note === (mine?.note ?? "")) return;
-                upsertProgress(detail.board.id, cell.id, { note });
+                void actions.upsertProgress(detail.board.id, cell.id, { note });
               }}
               placeholder="Nur für dich, bis zum Reveal"
             />
@@ -76,7 +77,7 @@ export function CellProgressSheet({
                 if (!file) return;
                 try {
                   const photoDataUrl = await compressImage(file);
-                  upsertProgress(detail.board.id, cell.id, { photoDataUrl });
+                  await actions.upsertProgress(detail.board.id, cell.id, { photoDataUrl });
                   setError("");
                 } catch (err: unknown) {
                   setError(err instanceof Error ? err.message : "Foto fehlgeschlagen.");
@@ -90,7 +91,7 @@ export function CellProgressSheet({
               {!locked ? (
                 <SecondaryButton
                   type="button"
-                  onClick={() => upsertProgress(detail.board.id, cell.id, { photoDataUrl: null })}
+                  onClick={() => void actions.upsertProgress(detail.board.id, cell.id, { photoDataUrl: null })}
                 >
                   Foto entfernen
                 </SecondaryButton>
